@@ -1,143 +1,124 @@
-const UserService = require("./user.services");
-const jwt = require("jsonwebtoken");
-const mail = require("../common.service");
-const multer = require('multer');
-const UserModel = require("./user.model");
+const UserService = require("./user.services")
+const CommonService =  require("../common.service")
+const jwt = require("jsonwebtoken")
+const multer = require('multer')
+
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'images/')
+  destination: function (req, file, cb) {
+    cb(null, 'images')
   },
   filename: (req, file, cb) => {
-    cb(null, file.originalname)
-  },
+    cb(null, Date.now() + '-' +file.originalname)
+  }
 })
-const upload= multer({ storage: storage }).single('file')
+
+const upload = multer({ storage: storage }).single('file')
 
 
-exports.register = function (req, res) {
-  UserService.createUser(req.body).then(
-    function (result) {
-      res.send({
-        message: "User Created",
-      });
-      console.log(result.email);
-      // mail.mailer(result.email)
-    },
-    function (error) {
-      if (error) {
-        res.status(409).send({
-          message: "User Already exist",
-        });
-      } else {
-        res.status(500).send();
-      }
-      console.log("It reached in rejection of controller");
-    }
-  );
-};
-exports.login = function (req, res) {
-  UserService.findUser(req.body).then(
-    function () {
-      //creating a jwt
-      var payload = {
-        email: req.body.email.toLowerCase(),
-      };
-      var token = jwt.sign(payload, "mysecretkey");
-      res.setHeader("Authorization", token);
-      res.send({
-        message: "Login Success",
-      });
-    },
-    function (error) {
-      if (error) {
-        res.status(500).send({
-          message: "Invalid Credentials",
-        });
-      } else {
-        res.status(500).send();
-      }
-    }
-  );
-};
-exports.deleteAccount = function (req, res) {};
-exports.editAccount = function (req, res) {};
-exports.forgotPassword = (req, res) => {
-  UserService.recoverPassword(req.body)
-    .once("NOT_FOUND", () => {
-      res.status(500).send({
-        message: "No Such Email Exists",
-      });
-    })
-    .once("MIl_GAYA", (result) => {
-      console.log("Anusha");
-      mail
-        .responseMail(req.body.email, result.password)
-        .then(() => {
-          res.send({
-            message: "Password Sent to your Email",
-          });
+exports.sandesh = function(req,res){
+    UserService.createUser(req.body).then(function(result){
+        CommonService.sendMail(req.body.email).then((result)=>{
+            console.log("resulkt of email sending" , result)
+            res.send({
+                message:"User Created"
+            })
+        }).catch((error)=>{
+            res.status(500).send()
+            console.log("Error in sending " , error)
         })
-        .catch(() => {
-          res.status(500).send();
-        });
+    },function(error){
+        if(error){
+            res.status(409).send({
+                message:"User already exists"
+            })
+        }
+        else{
+            res.status(500).send()
+
+        }
+        console.log("it reached in rejection of controller")
     })
-    .once("ERROR", () => {
-      res.status(500).send();
-    });
-};
-exports.search = (req, res) => {
-  console.log("query is ", req.query);
-  UserService.findUsers(req.query)
-    .then((result) => {
-      console.log(result);
-      res.send({
-        result,
-      });
-    })
-    .catch(function () {
-      res.status(500);
-    });
 }
-exports.uploadImage = (req, res) => {
-    upload(req, res, (err) => {
-      if (err) {
-          console.log("error is",err)
-        res.sendStatus(500);
-      }
-      res.send(req.file);
-    });
-  }
-  exports.updateProfile = (req, res) => {
 
-    UserService.updateProfile(req.body, (error, data) => {
+exports.login = function(req,res){
+    UserService.findUser(req.body).then(function(result){
+        // creating a jwt 
+        var payload = {
+            email:req.body.email.toLowerCase()
+        }
+        var token = jwt.sign(payload,"mysecretkey")
+        res.setHeader("Authorization", token)
+        res.send({
+            user:result,
+            message:"login success"
+        })
+    }, function(error){
+        if(error){
+            res.status(500).send({
+                message:"Invalid credentials"
+            })
+        }
+        else{
+            res.status(500).send()
+        }
+    })
+}
 
-      if (error) {
 
+exports.deleteAccount = function(req,res){
+    
+}
+
+exports.recoverPassword = (req,res)=>{
+    UserService.recoverPassword(req.body)
+    .once("NOT_FOUND", function(){
         res.status(500).send({
-
-          message: "Could not update Profile"
-
+            message:"No Such Email Exists"
         })
-
-      } else {
-
-        res.status(204).send({
-
-          user: data
-
+    })
+    .once("FOUND", function(result){
+        CommonService.sendPassword(req.body.email,result.password).then(()=>{
+            res.send({
+                message:"Password Sent to your Email"
+            })
+        }).catch((error)=>{
+            console.log("Error is" , error)
+            res.status(500).send()
         })
+    })
+    .once("ERROR", ()=>{
+        res.status(500).send()
+    })
+}
 
-      }
+exports.search = (req,res)=>{
+    console.log("Query is" , req.query)
+    UserService.findUsers(req.query).then((result)=>{
+        res.send({
+            users:result
+        })
+    }).catch(function(){
+        res.status(500)
+    })
+}
+
+exports.uploadProfileImage = (req,res)=>{
+    upload(req, res, (err) => {
+        if (err) {
+          res.sendStatus(500);
+        }
+        res.send(req.file);
+      });
+}
+
+exports.updateProfile = (req,res)=>{
+    UserService.updateProfile(req.body,function(error,result){
+        if(error){
+            res.status(500).send()
+        }
+        else{
+            res.status(204).send()
+        }
 
     })
-
- 
-
- 
-
- 
-
-  }
-  exports.isLogin=(req,res)=>{
-    
-  }
+}
